@@ -1,0 +1,39 @@
+#!/bin/bash
+#Check if user is root, if not elevate the script
+if [[ $EUID -ne 0 ]]; then
+   sudo bash $0 $USER
+   exit 0
+fi
+
+# Get username
+if [[ -z $1 ]]
+then
+    username=$USER
+else
+    username=$1
+fi
+
+# Update System
+pacman -Syu -y
+
+# Install Docker & Docker Compose
+pacman -S docker docker-compose -y
+
+# Add user to docker group
+echo "Adding $username to docker group"
+usermod -aG docker $username
+
+if [[ $? == 0 ]]
+then
+    echo "Install Success"
+else
+    echo "Install Failed"
+fi
+
+# Enable docker docker at start-up
+systemctl enable docker
+
+# Reboot for usermod to take effect
+echo $'\nRebooting shortly for effects to take place'
+sleep 5
+reboot
