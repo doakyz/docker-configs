@@ -1,0 +1,59 @@
+#!/bin/bash
+
+#Check if user is root, if not elevate the script
+if [[ $EUID -ne 0 ]]; then
+   sudo bash $0 $USER
+   exit 0
+fi
+
+# Get username
+if [[ -z $1 ]]
+then
+    username=$USER
+else
+    username=$1
+fi
+
+
+# Update System
+apt update -y
+apt upgrade -y
+apt install curl libffi-dev libssl-dev python3-dev python3 python3-pip -y
+
+# Install docker
+curl -sSL https://get.docker.com/ | sh
+
+# Install docker-compose (Latest)
+pip3 install docker-compose
+
+# Test docker-compose
+
+echo """
+version: '2'
+services:
+  hello_world:
+    image: ubuntu
+    command: [/bin/echo, 'Hello world']
+""" > /tmp/docker-compose.yml
+
+cd /tmp
+docker-compose up
+
+# Add user to docker group
+echo "Adding $username to docker group"
+usermod -aG docker $username
+
+if [[ $? == 0 ]]
+then
+    echo "Install Success"
+else
+    echo "Install Failed"
+fi
+
+# Enable docker docker at start-up
+systemctl enable docker
+
+# Reboot for usermod to take effect
+echo $'\nRebooting shortly for effects to take place'
+sleep 5
+reboot
