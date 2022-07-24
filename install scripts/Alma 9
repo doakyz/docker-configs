@@ -1,0 +1,51 @@
+#!/bin/bash
+#Check if user is root, if not elevate the script
+if [[ $EUID -ne 0 ]]; then
+   sudo bash $0 $USER
+   exit 0
+fi
+
+# Get username
+if [[ -z $1 ]]
+then
+    username=$USER
+else
+    username=$1
+fi
+dnf update
+dnf install dnf-utils
+yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo -y
+yum install docker-ce docker-ce-cli containerd.io docker-compose-plugin -y
+docker compose version
+sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/sysconfig/selinux
+setenforce 0 <-- disable selinux at runtime
+systemctl start docker -y
+systemctl enable docker
+
+# Test docker-compose
+echo """
+version: '2'
+services:
+  hello_world:
+    image: ubuntu
+    command: [/bin/echo, 'Hello world']
+""" > /tmp/docker-compose.yml
+
+cd /tmp
+docker compose up
+
+# Add user to docker group
+echo "Adding $username to docker group"
+usermod -aG docker $username
+
+if [[ $? == 0 ]]
+then
+    echo "Install Success"
+else
+    echo "Install Failed"
+fi
+
+# Reboot for usermod to take effect
+echo $'\nRebooting shortly for effects to take place'
+sleep 5
+reboot
